@@ -54,3 +54,4 @@ pip-delete-this-directory.txt
 .idea/
 .DS_Store
 Thumbs.db
+Funnel_Cohort_NG/data/
