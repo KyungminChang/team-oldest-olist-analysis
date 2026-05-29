@@ -54,7 +54,7 @@ Olist 원본 테이블은 동일한 주문에 여러 행이 존재할 수 있습
 - 배송 완료 주문만 사용하는 배송 성과 분석
 - 취소 주문 원인 또는 지역 분포 분석
 
-대신 배송 성과 분석용 데이터셋은 아래 조건으로 별도 생성합니다.
+대신 배송 성과 분석용 데이터셋은 아래 조건으로 별도 생성합니다. `anomaly_flag`에는 배송 분석 필수 날짜의 결측도 포함되므로, 배송일 또는 지연 여부 확인이 불가능한 주문 상품도 제외됩니다.
 
 ```python
 is_delivered == True and anomaly_flag == 0
@@ -134,13 +134,14 @@ is_delivered == True and anomaly_flag == 0
 | --- | --- |
 | `anomaly_carrier_before_approved` | 운송사 인계일이 결제 승인일보다 빠른지 여부 |
 | `anomaly_customer_before_carrier` | 고객 수령일이 운송사 인계일보다 빠른지 여부 |
-| `anomaly_flag` | 위 두 날짜 역전 조건 중 하나라도 만족하면 `1` |
+| `anomaly_missing_required_delivery_date` | 승인일, 운송사 인계일, 고객 배송일, 예정 배송일 중 하나라도 결측이면 `True` |
+| `anomaly_flag` | 날짜 역전 또는 배송 분석 필수 날짜 결측이 하나라도 있으면 `1` |
 | `delivery_days_all` | 주문부터 고객 수령까지 걸린 일수 |
-| `delivery_days_clean` | 날짜 이상치가 없는 주문에 대해서만 유지한 배송 일수 |
+| `delivery_days_clean` | 날짜 역전 또는 주요 배송 날짜 결측이 없는 주문에 대해서만 유지한 배송 일수 |
 | `is_late` | 실제 고객 수령일이 예정일보다 늦었는지 여부 |
 | `is_delivered` | 주문 상태가 `delivered`인지 여부 |
 
-`delivery_days_all`은 원본 사실을 유지하기 위한 변수이고, 배송 성과 집계에는 `delivery_days_clean` 사용을 권장합니다.
+`delivery_days_all`은 원본 사실을 유지하기 위한 변수이고, 배송 성과 집계에는 날짜 역전과 주요 배송 날짜 결측을 제외한 `delivery_days_clean` 사용을 권장합니다.
 
 ### 4.4 고객 및 판매자 지역 전처리
 
@@ -345,7 +346,7 @@ payment_minus_item = payment_value_total - item_total
 | 출력 파일 | 포함 범위 | 권장 용도 |
 | --- | --- | --- |
 | `data/processed/olist_order_item_level.csv` | 모든 주문 상태의 주문-상품 데이터 | 주문 흐름, 취소 포함 전체 현황 분석 |
-| `data/processed/olist_delivered_item_level.csv` | 완료 배송이며 날짜 이상치가 없는 주문-상품 데이터 | 배송 시간, 지연, 지역/허브 분석 |
+| `data/processed/olist_delivered_item_level.csv` | 완료 배송이며 날짜 역전/주요 배송 날짜 결측이 없는 주문-상품 데이터 | 배송 시간, 지연, 지역/허브 분석 |
 
 저장 인코딩은 `utf-8-sig`입니다. 한글 파생 컬럼을 Excel 등에서 열 때 문자 깨짐을 줄이기 위한 설정입니다.
 
@@ -353,7 +354,7 @@ payment_minus_item = payment_value_total - item_total
 
 ### 7.1 적용 범위 및 기준
 
-`olist_order_item_level.csv`와 `olist_delivered_item_level.csv`는 **동일한 66개 컬럼 구조**를 사용합니다. 두 파일의 차이는 스키마가 아니라 포함 행의 필터 조건입니다.
+`olist_order_item_level.csv`와 `olist_delivered_item_level.csv`는 새 로직으로 다시 생성하면 **동일한 67개 컬럼 구조**를 사용합니다. 두 파일의 차이는 스키마가 아니라 포함 행의 필터 조건입니다.
 
 | 파일 | 행 포함 조건 | 기준 단위 |
 | --- | --- | --- |
@@ -370,7 +371,7 @@ payment_minus_item = payment_value_total - item_total
 | `datetime` | 날짜 또는 날짜-시간 값 |
 | `boolean` | `True`/`False` 조건 플래그 |
 
-`생성 구분`이 `원본`인 컬럼은 입력 CSV에서 직접 가져온 값이며, `파생` 또는 `집계`인 컬럼은 통합 전처리 과정에서 새로 생성된 값입니다. 원본 컬럼은 30개, 새 파생/집계 컬럼은 36개입니다.
+`생성 구분`이 `원본`인 컬럼은 입력 CSV에서 직접 가져온 값이며, `파생` 또는 `집계`인 컬럼은 통합 전처리 과정에서 새로 생성된 값입니다. 노트북을 새 로직으로 실행하면 원본 컬럼은 30개, 새 파생/집계 컬럼은 37개로 총 67개 컬럼이 저장됩니다.
 
 ### 7.2 주문 상품 및 주문 정보
 
@@ -403,9 +404,10 @@ payment_minus_item = payment_value_total - item_total
 | `purchase_hour` | integer | 파생 | 구매 시각의 시간 값으로, `0`부터 `23`까지입니다. |
 | `anomaly_carrier_before_approved` | boolean | 파생 | 운송사 인계일이 결제 승인일보다 빠르면 `True`입니다. |
 | `anomaly_customer_before_carrier` | boolean | 파생 | 고객 배송일이 운송사 인계일보다 빠르면 `True`입니다. |
-| `anomaly_flag` | integer | 파생 | 날짜 역전 이상치가 하나라도 있으면 `1`, 없으면 `0`입니다. |
+| `anomaly_missing_required_delivery_date` | boolean | 파생 | `order_approved_at`, `order_delivered_carrier_date`, `order_delivered_customer_date`, `order_estimated_delivery_date` 중 하나라도 결측이면 `True`입니다. |
+| `anomaly_flag` | integer | 파생 | 날짜 역전 또는 배송 분석 필수 날짜 결측이 하나라도 있으면 `1`, 아니면 `0`입니다. |
 | `delivery_days_all` | integer | 파생 | 구매일시부터 고객 배송일시까지의 경과 일수입니다. 이상치도 포함합니다. |
-| `delivery_days_clean` | integer | 파생 | `anomaly_flag == 0`인 경우에만 유지한 배송 소요일입니다. |
+| `delivery_days_clean` | integer | 파생 | 날짜 역전과 주요 배송 날짜 결측이 없는 `anomaly_flag == 0`인 경우에만 유지한 배송 소요일입니다. |
 | `is_late` | boolean | 파생 | 실제 배송일이 배송 예정일보다 늦으면 `True`입니다. |
 | `is_delivered` | boolean | 파생 | `order_status`가 `delivered`이면 `True`입니다. |
 
@@ -482,7 +484,7 @@ payment_minus_item = payment_value_total - item_total
 | `order_id` | 파일은 주문-상품 단위이므로 주문 건수는 행 수가 아니라 `nunique()`로 계산합니다. |
 | `payment_value_total` | 주문 단위 집계 값이 상품 행마다 반복되므로 상품 행 기준 단순 합산을 하지 않습니다. |
 | `review_score_mean` | 주문 단위 리뷰 평균이 상품 행마다 반복되므로 상품 수가 많은 주문에 가중되지 않도록 주의합니다. |
-| `delivery_days_all` | 날짜 역전 이상치가 포함될 수 있습니다. 일반 배송시간 분석에는 `delivery_days_clean`을 사용합니다. |
+| `delivery_days_all` | 날짜 역전 이상치 또는 배송 단계 날짜 결측이 포함될 수 있습니다. 일반 배송시간 분석에는 `delivery_days_clean`을 사용합니다. |
 | `seller_state_geo_mismatch` | 원본 오류 확정값이 아니라 위치 정보 확인이 필요한 대상을 표시하는 플래그입니다. |
 | `product_category_name_english` | 번역 결합에 실패한 상품은 결측일 수 있습니다. |
 
@@ -525,7 +527,7 @@ product_category_name_translation.csv
 
 ### 8.2 배송 소요 시간 분석
 
-`delivery_days_clean`을 사용하면 날짜 순서가 비정상인 레코드를 제외한 배송 기간을 분석할 수 있습니다.
+`delivery_days_clean`을 사용하면 날짜 순서가 비정상이거나 주요 배송 단계 날짜가 결측인 레코드를 제외한 배송 기간을 분석할 수 있습니다.
 
 추천 기준 컬럼:
 
