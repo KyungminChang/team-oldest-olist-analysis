@@ -1,4 +1,4 @@
-# Olist 물류 인프라 투자 후보 분석 보고서
+﻿# Olist 물류 인프라 투자 후보 분석 보고서
 
 ## 1. 분석 목적
 
@@ -16,7 +16,7 @@
 | 데이터 | 용도 |
 |---|---|
 | `data/processed/olist_delivered_item_level_cleaned_errors.csv` | 배송 완료 주문-상품 단위 데이터, 리뷰 점수, 배송 기간, 지연 여부, 고객 주/권역 |
-| `data/brazil_state_population_2016_2018.csv` | 브라질 주별 2016~2018 인구 데이터 |
+| `data/brazil_state_gdp_population_density_2016_2018_ibge_population.csv` | 브라질 주별 2016~2018 인구 데이터 |
 | `population_adjusted_olist_usage_infrastructure.ipynb` | 인구 대비 이용량, 인프라 후보 점수, 기대효과 분석 |
 | `review_score_logistics_correlation.ipynb` | 리뷰 점수와 물류 변수의 상관 및 지역별 평점 차이 분석 |
 
